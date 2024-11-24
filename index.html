@@ -46,7 +46,8 @@
   <script type="module">
     // Import Firebase SDKs
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-app.js";
-    import { getDatabase, ref, onValue, set, update } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-database.js";
+    import { getDatabase, ref, onValue, set } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-database.js";
+    import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-storage.js";
 
     // Firebase configuration
     const firebaseConfig = {
@@ -63,6 +64,7 @@
     // Initialize Firebase
     const app = initializeApp(firebaseConfig);
     const database = getDatabase(app);
+    const storage = getStorage(app);
 
     // Fetch and display images on the canvas
     onValue(ref(database, 'images'), (snapshot) => {
@@ -113,24 +115,34 @@
       document.getElementById('canvas').appendChild(img);
     }
 
-    // Handle image upload and saving URL to Firebase
+    // Handle image upload and saving URL to Firebase Storage
     document.getElementById('uploadForm').addEventListener('submit', async (event) => {
       event.preventDefault();
       const fileInput = document.getElementById('fileInput');
       const file = fileInput.files[0];
       if (!file) return;
 
-      // Here, you need to use your Google Drive public image URL or a Firebase Storage upload function
-      const imageUrl = prompt('Enter public image URL'); // Use a Google Drive URL or Firebase Storage URL
+      // Upload file to Firebase Storage
+      const storagePath = 'images/' + Date.now() + '-' + file.name;
+      const storageReference = storageRef(storage, storagePath);
+      
+      try {
+        // Upload image to Firebase Storage
+        const snapshot = await uploadBytes(storageReference, file);
+        const downloadURL = await getDownloadURL(snapshot.ref);
 
-      const imageId = ref(database, 'images').push().key;
-      set(ref(database, 'images/' + imageId), {
-        url: imageUrl,
-        x: 0,
-        y: 0
-      });
+        // Save image URL and initial position to Firebase Database
+        const imageId = ref(database, 'images').push().key;
+        set(ref(database, 'images/' + imageId), {
+          url: downloadURL,
+          x: 0,
+          y: 0
+        });
 
-      fileInput.value = ''; // Clear the input field
+        fileInput.value = ''; // Clear the input field
+      } catch (error) {
+        console.error('Error uploading image: ', error);
+      }
     });
   </script>
 </body>
