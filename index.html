@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Collaborative Image Canvas</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      background-color: #f0f0f0;
+    }
+    #canvas {
+      position: relative;
+      width: 100%;
+      height: 100vh;
+      border: 1px solid #ddd;
+      background-color: #fff;
+      overflow: hidden;
+    }
+    .image {
+      position: absolute;
+      cursor: grab;
+      max-width: 200px;
+      max-height: 200px;
+    }
+    #uploadForm {
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      background-color: rgba(255, 255, 255, 0.8);
+      padding: 10px;
+      border-radius: 5px;
+    }
+  </style>
+</head>
+<body>
+  <div id="canvas"></div>
+
+  <form id="uploadForm">
+    <input type="file" id="fileInput" accept="image/*" />
+    <button type="submit">Upload Image</button>
+  </form>
+
+  <script type="module">
+    // Import Firebase SDKs
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-app.js";
+    import { getDatabase, ref, onValue, set, update } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-database.js";
+
+    // Firebase configuration
+    const firebaseConfig = {
+      apiKey: "AIzaSyDsvrgrS9DoZ633-OsjNz_x68LJFRUdJwo",
+      authDomain: "streamerguide-85154.firebaseapp.com",
+      databaseURL: "https://streamerguide-85154-default-rtdb.europe-west1.firebasedatabase.app",
+      projectId: "streamerguide-85154",
+      storageBucket: "streamerguide-85154.firebasestorage.app",
+      messagingSenderId: "365901190642",
+      appId: "1:365901190642:web:a1da5e125b0a319c01876b",
+      measurementId: "G-SXGLWQ2K09"
+    };
+
+    // Initialize Firebase
+    const app = initializeApp(firebaseConfig);
+    const database = getDatabase(app);
+
+    // Fetch and display images on the canvas
+    onValue(ref(database, 'images'), (snapshot) => {
+      const images = snapshot.val() || {};
+      document.getElementById('canvas').innerHTML = ''; // Clear canvas before redrawing
+      for (const id in images) {
+        const { url, x, y } = images[id];
+        addImageToCanvas(url, id, x, y);
+      }
+    });
+
+    // Add image to the canvas
+    function addImageToCanvas(imageUrl, id, x = 0, y = 0) {
+      const img = document.createElement('img');
+      img.src = imageUrl;
+      img.className = 'image';
+      img.style.left = `${x}px`;
+      img.style.top = `${y}px`;
+      img.dataset.id = id;
+
+      // Enable drag-and-drop functionality
+      img.addEventListener('mousedown', (e) => {
+        img.style.cursor = 'grabbing';
+        const offsetX = e.clientX - img.offsetLeft;
+        const offsetY = e.clientY - img.offsetTop;
+
+        function onMouseMove(e) {
+          img.style.left = `${e.clientX - offsetX}px`;
+          img.style.top = `${e.clientY - offsetY}px`;
+
+          // Update position in Firebase in real-time
+          update(ref(database, 'images/' + id), {
+            x: e.clientX - offsetX,
+            y: e.clientY - offsetY
+          });
+        }
+
+        function onMouseUp() {
+          img.style.cursor = 'grab';
+          window.removeEventListener('mousemove', onMouseMove);
+          window.removeEventListener('mouseup', onMouseUp);
+        }
+
+        window.addEventListener('mousemove', onMouseMove);
+        window.addEventListener('mouseup', onMouseUp);
+      });
+
+      document.getElementById('canvas').appendChild(img);
+    }
+
+    // Handle image upload and saving URL to Firebase
+    document.getElementById('uploadForm').addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const fileInput = document.getElementById('fileInput');
+      const file = fileInput.files[0];
+      if (!file) return;
+
+      // Here, you need to use your Google Drive public image URL or a Firebase Storage upload function
+      const imageUrl = prompt('Enter public image URL'); // Use a Google Drive URL or Firebase Storage URL
+
+      const imageId = ref(database, 'images').push().key;
+      set(ref(database, 'images/' + imageId), {
+        url: imageUrl,
+        x: 0,
+        y: 0
+      });
+
+      fileInput.value = ''; // Clear the input field
+    });
+  </script>
+</body>
+</html>
