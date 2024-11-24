@@ -24,6 +24,8 @@
       cursor: grab;
       max-width: 200px;
       max-height: 200px;
+      resize: both;
+      overflow: hidden;
     }
     #uploadForm {
       position: fixed;
@@ -71,18 +73,20 @@
       const images = snapshot.val() || {};
       document.getElementById('canvas').innerHTML = ''; // Clear canvas before redrawing
       for (const id in images) {
-        const { url, x, y } = images[id];
-        addImageToCanvas(url, id, x, y);
+        const { url, x, y, width, height } = images[id];
+        addImageToCanvas(url, id, x, y, width, height);
       }
     });
 
     // Add image to the canvas
-    function addImageToCanvas(imageUrl, id, x = 0, y = 0) {
+    function addImageToCanvas(imageUrl, id, x = 0, y = 0, width = 200, height = 200) {
       const img = document.createElement('img');
       img.src = imageUrl;
       img.className = 'image';
       img.style.left = `${x}px`;
       img.style.top = `${y}px`;
+      img.style.width = `${width}px`;
+      img.style.height = `${height}px`;
       img.dataset.id = id;
 
       // Enable drag-and-drop functionality
@@ -96,9 +100,11 @@
           img.style.top = `${e.clientY - offsetY}px`;
 
           // Update position in Firebase in real-time
-          update(ref(database, 'images/' + id), {
+          set(ref(database, 'images/' + id), {
             x: e.clientX - offsetX,
-            y: e.clientY - offsetY
+            y: e.clientY - offsetY,
+            width: img.offsetWidth,
+            height: img.offsetHeight
           });
         }
 
@@ -125,18 +131,20 @@
       // Upload file to Firebase Storage
       const storagePath = 'images/' + Date.now() + '-' + file.name;
       const storageReference = storageRef(storage, storagePath);
-      
+
       try {
         // Upload image to Firebase Storage
         const snapshot = await uploadBytes(storageReference, file);
-        const downloadURL = await getDownloadURL(snapshot.ref);
+        const downloadURL = await getDownloadURL(snapshot.ref());
 
         // Save image URL and initial position to Firebase Database
         const imageId = ref(database, 'images').push().key;
         set(ref(database, 'images/' + imageId), {
           url: downloadURL,
           x: 0,
-          y: 0
+          y: 0,
+          width: 200,
+          height: 200
         });
 
         fileInput.value = ''; // Clear the input field
